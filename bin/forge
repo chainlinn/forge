@@ -476,32 +476,42 @@ cmd_destroy() {
         git add .github/workflows/cleanup.yml
         git commit --quiet -m "forge: cleanup before destroy [skip ci]" || true
         gh auth setup-git --hostname github.com 2>/dev/null || true
-        git push --quiet 2>&1 || true
 
-        # Trigger cleanup workflow
-        echo "  Triggering cleanup workflow..."
-        gh workflow run cleanup.yml -R "$gh_repo" 2>&1 || echo "  Warning: could not trigger cleanup workflow" >&2
+        # Ensure remote exists
+        git remote get-url origin >/dev/null 2>&1 || \
+            git remote add origin "https://github.com/$gh_repo.git"
 
-        # Poll for workflow completion
-        echo "  Waiting for cleanup to complete..."
-        local waited=0
-        while [[ $waited -lt 120 ]]; do
-            local status
-            status=$(gh run list -R "$gh_repo" --workflow=cleanup.yml --limit 1 --json status,conclusion -q '.[0].status' 2>/dev/null || echo "")
-            local conclusion
-            conclusion=$(gh run list -R "$gh_repo" --workflow=cleanup.yml --limit 1 --json status,conclusion -q '.[0].conclusion' 2>/dev/null || echo "")
-            if [[ "$status" == "completed" ]]; then
-                echo "  Cleanup workflow: $conclusion"
-                break
+        if git push --quiet 2>&1; then
+            # Trigger cleanup workflow
+            echo "  Triggering cleanup workflow..."
+            if gh workflow run cleanup.yml -R "$gh_repo" 2>&1; then
+                # Poll for workflow completion
+                echo "  Waiting for cleanup to complete..."
+                local waited=0
+                while [[ $waited -lt 120 ]]; do
+                    local status
+                    status=$(gh run list -R "$gh_repo" --workflow=cleanup.yml --limit 1 --json status,conclusion -q '.[0].status' 2>/dev/null || echo "")
+                    local conclusion
+                    conclusion=$(gh run list -R "$gh_repo" --workflow=cleanup.yml --limit 1 --json status,conclusion -q '.[0].conclusion' 2>/dev/null || echo "")
+                    if [[ "$status" == "completed" ]]; then
+                        echo "  Cleanup workflow: $conclusion"
+                        break
+                    fi
+                    sleep 5
+                    waited=$((waited + 5))
+                    if [[ $((waited % 15)) -eq 0 ]]; then
+                        echo "  ... waiting ($waited s)"
+                    fi
+                done
+                if [[ $waited -ge 120 ]]; then
+                    echo "  Warning: cleanup workflow timed out" >&2
+                fi
+            else
+                echo "  Warning: cleanup workflow not found on remote (push may have failed)" >&2
             fi
-            sleep 5
-            waited=$((waited + 5))
-            if [[ $((waited % 15)) -eq 0 ]]; then
-                echo "  ... waiting ($waited s)"
-            fi
-        done
-        if [[ $waited -ge 120 ]]; then
-            echo "  Warning: cleanup workflow timed out, proceeding anyway" >&2
+        else
+            echo "  Warning: git push failed, skipping remote cleanup" >&2
+            echo "  Manually clean NAS: rm -rf $deploy_root/$repo_name" >&2
         fi
 
         cd - >/dev/null
