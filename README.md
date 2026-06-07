@@ -7,6 +7,8 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.1.0-6366f1)](https://github.com/chainlinn/forge/releases)
 
+![demo](static/demo.gif)
+
 [安装](#安装) · [快速开始](#快速开始) · [命令](#命令) · [模板](#模板) · [部署架构](#部署架构)
 
 </div>
@@ -193,4 +195,4 @@ GitHub Actions
 
 ## License
 
-[MIT](LICENSE) © [chainlinn](https://github.com/chainlinn)
+This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.

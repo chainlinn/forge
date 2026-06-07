@@ -1,0 +1,2 @@
+Place demo.gif here.
+Record: forge init → git push → CI build → deploy → browser open index.html
