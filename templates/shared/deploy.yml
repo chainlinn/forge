@@ -82,6 +82,10 @@ jobs:
             cd ${{ env.APP_DIR }}/docker/compose
             export APP_NAME="${{ env.APP_NAME }}" APP_DIR="${{ env.APP_DIR }}" DATA_DIR="${{ env.APP_DIR }}/data"
 
+            # Ensure data directory exists and is writable (Docker may create it as root)
+            mkdir -p "$DATA_DIR"
+            [ -w "$DATA_DIR" ] || sudo chown -R "$(whoami):$(whoami)" "$DATA_DIR" 2>/dev/null || true
+
             # ── Project pre-deploy hook ──
             if [ -f forge/hooks/pre-deploy.sh ]; then
               echo "→ Running pre-deploy hook..."
