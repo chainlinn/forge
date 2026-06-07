@@ -4,7 +4,7 @@ set -euo pipefail
 FORGE_CONFIG_DIR="${FORGE_CONFIG_DIR:-$HOME/.forge/config}"
 FORGE_PORTS_FILE="$HOME/.forge/ports"
 FORGE_DEFAULT_SECRETS="${FORGE_DEFAULT_SECRETS:-$FORGE_CONFIG_DIR/.secrets}"
-PORT_START=8889
+PORT_START="${FORGE_PORT_START:-8889}"
 
 # Template path: Homebrew install → /opt/homebrew/share/forge/templates
 # Local dev → $HOME/.forge/templates
@@ -141,43 +141,61 @@ set_github_secrets() {
     done
 }
 
-assign_port() {
-    local project_name="$1" forced_port="$2"
+# Port registry: ~/.forge/ports  (one "project:port" per line)
+port_of()   { awk -F: -v n="$1" '$1 == n { print $2; exit }' "$FORGE_PORTS_FILE" 2>/dev/null; }
+owner_of()  { awk -F: -v p="$1" '$2 == p { print $1; exit }' "$FORGE_PORTS_FILE" 2>/dev/null; }
+port_used() { awk -F: -v p="$1" '$2 == p { exit 0 } END { exit 1 }' "$FORGE_PORTS_FILE" 2>/dev/null; }
 
-    if [[ -n "$forced_port" ]]; then
-        if [[ -f "$FORGE_PORTS_FILE" ]]; then
-            local existing
-            existing=$(grep -E "^[^:]+:$forced_port\$" "$FORGE_PORTS_FILE" | cut -d: -f1 || true)
-            if [[ -n "$existing" && "$existing" != "$project_name" ]]; then
-                echo "Error: port $forced_port is already assigned to '$existing'" >&2
-                exit 1
-            fi
+port_assign() {
+    local name="$1" want="${2:-}"
+    [[ -z "$name" ]] && { echo "Error: port_assign requires a project name" >&2; exit 1; }
+
+    # --port given: validate conflict, then register
+    if [[ -n "$want" ]]; then
+        local owner
+        owner=$(owner_of "$want")
+        if [[ -n "$owner" && "$owner" != "$name" ]]; then
+            echo "Error: port $want is already assigned to '$owner'" >&2; exit 1
         fi
-        echo "$forced_port"
+        port_register "$name" "$want"
+        echo "$want"
         return
     fi
 
-    if [[ -f "$FORGE_PORTS_FILE" ]]; then
-        local existing_port
-        existing_port=$(grep "^$project_name:" "$FORGE_PORTS_FILE" | cut -d: -f2 || true)
-        if [[ -n "$existing_port" ]]; then
-            echo "$existing_port"
-            return
-        fi
+    # Reuse existing assignment
+    local existing
+    existing=$(port_of "$name")
+    if [[ -n "$existing" ]]; then
+        echo "$existing"
+        return
     fi
 
-    local port="$PORT_START"
-    local used_ports=""
-    if [[ -f "$FORGE_PORTS_FILE" ]]; then
-        used_ports=$(cut -d: -f2 "$FORGE_PORTS_FILE" | sort -n)
-    fi
-    while echo "$used_ports" | grep -qx "$port"; do
-        port=$((port + 1))
+    # Find first free port from PORT_START
+    local p="$PORT_START"
+    while port_used "$p"; do
+        p=$((p + 1))
     done
+    port_register "$name" "$p"
+    echo "$p"
+}
 
+port_register() {
+    local name="$1" port="$2"
     mkdir -p "$(dirname "$FORGE_PORTS_FILE")"
-    echo "$project_name:$port" >> "$FORGE_PORTS_FILE"
-    echo "$port"
+    # Remove old entry for this project (if any), then append
+    if [[ -f "$FORGE_PORTS_FILE" ]]; then
+        grep -v "^$name:" "$FORGE_PORTS_FILE" > "$FORGE_PORTS_FILE.tmp" 2>/dev/null || true
+        mv "$FORGE_PORTS_FILE.tmp" "$FORGE_PORTS_FILE"
+    fi
+    echo "$name:$port" >> "$FORGE_PORTS_FILE"
+}
+
+port_release() {
+    local name="$1"
+    if [[ -f "$FORGE_PORTS_FILE" ]]; then
+        grep -v "^$name:" "$FORGE_PORTS_FILE" > "$FORGE_PORTS_FILE.tmp" 2>/dev/null || true
+        mv "$FORGE_PORTS_FILE.tmp" "$FORGE_PORTS_FILE"
+    fi
 }
 
 render_template() {
@@ -287,7 +305,7 @@ cmd_init() {
 
     local container_port=80
     local port
-    port=$(assign_port "$repo_name" "$host_port")
+    port=$(port_assign "$repo_name" "$host_port")
 
     local image_name="$dh_user/$repo_name:dev"
 
@@ -503,10 +521,7 @@ cmd_destroy() {
     echo ""
     echo "=== Phase 3: Removing local directory ==="
 
-    if [[ -f "$FORGE_PORTS_FILE" ]]; then
-        grep -v "^$repo_name:" "$FORGE_PORTS_FILE" > "$FORGE_PORTS_FILE.tmp" || true
-        mv "$FORGE_PORTS_FILE.tmp" "$FORGE_PORTS_FILE"
-    fi
+    port_release "$repo_name"
 
     if [[ "$target_dir" == "$PWD" ]] || [[ "$PWD" == "$target_dir"/* ]]; then
         cd "$(dirname "$target_dir")"
