@@ -6,7 +6,7 @@
 
 ```bash
 brew tap chainlinn/tap
-brew install forge
+brew install forge-cli
 ```
 
 或手动安装：
