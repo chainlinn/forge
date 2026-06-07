@@ -79,9 +79,22 @@ jobs:
           script: |
             set -e
             cd ${{ env.APP_DIR }}/docker/compose
+            export APP_NAME="${{ env.APP_NAME }}" APP_DIR="${{ env.APP_DIR }}" DATA_DIR="${{ env.APP_DIR }}/data"
+
+            # ── Project pre-deploy hook ──
+            if [ -f forge/hooks/pre-deploy.sh ]; then
+              echo "→ Running pre-deploy hook..."
+              bash forge/hooks/pre-deploy.sh
+            fi
 
             printf '%s' '${{ secrets.DOCKERHUB_TOKEN }}' | docker login -u '${{ secrets.DOCKERHUB_USERNAME }}' --password-stdin
 
             docker compose pull
             docker compose up -d --remove-orphans
             docker compose ps
+
+            # ── Project post-deploy hook ──
+            if [ -f forge/hooks/post-deploy.sh ]; then
+              echo "→ Running post-deploy hook..."
+              bash forge/hooks/post-deploy.sh
+            fi

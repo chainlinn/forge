@@ -338,7 +338,12 @@ cmd_init() {
     echo ""
     echo "=== Scaffolding project (port=$port) ==="
 
-    mkdir -p .github/workflows
+    mkdir -p .github/workflows forge/hooks
+
+    # Copy hook scripts (not templated — user edits them later)
+    if [[ -d "$tmpl_dir/shared/forge/hooks" ]]; then
+        cp "$tmpl_dir/shared/forge/hooks/"* "forge/hooks/" 2>/dev/null || true
+    fi
 
     render_template "$tmpl_dir/shared/Dockerfile" "Dockerfile" \
         "$image_name" "$docker_name" "$port" "$container_port" "$deploy_root"

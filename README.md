@@ -29,7 +29,8 @@
 |------|------|
 | 仓库创建 | `gh repo create` + Docker Hub repo（`docker push` 自动建） |
 | Secrets 同步 | `.secrets` 全量注册到 GitHub Secrets，`_BASE64` 自动解码 |
-| 脚手架生成 | Dockerfile + compose + deploy.yml + 部署状态页 |
+| 脚手架生成 | Dockerfile + compose + deploy.yml + 钩子脚本 + 状态页 |
+| 生命周期钩子 | `forge/hooks/{pre,post}-deploy.sh`，deploy.yml 永不需修改 |
 | 端口管理 | 自动分配/冲突检测/销毁释放，`~/.forge/ports` 追踪 |
 | 一键销毁 | CI 远程清理 NAS 容器 → 删远程仓库 → 删本地目录 |
 
@@ -90,11 +91,14 @@ forge init my-api --port 9000 --visibility public
 
 ```
 my-api/
-├── Dockerfile              # nginx:1.27-alpine
-├── docker-compose.yml      # image + ports + volumes
-├── index.html              # 部署状态页（timeline 展示全流程）
+├── Dockerfile
+├── docker-compose.yml
+├── index.html              # 部署状态页
+├── forge/hooks/
+│   ├── pre-deploy.sh       # 部署前钩子（NAS 端执行）
+│   └── post-deploy.sh      # 部署后钩子
 └── .github/workflows/
-    └── deploy.yml          # Build → Push → Tailscale → Deploy
+    └── deploy.yml          # Build → Push → Tailscale → Deploy（调用 hooks）
 ```
 
 ### `forge sync`
