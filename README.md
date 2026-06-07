@@ -2,7 +2,7 @@
 
 # forge
 
-**CLI 工具 — 一条命令创建 GitHub 仓库 + Docker Hub 仓库 + CI/CD 流水线**
+**通过 GitHub Actions + Tailscale 安全隧道，一键将代码部署到你的私有服务器。**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.1.0-6366f1)](https://github.com/chainlinn/forge/releases)
@@ -17,16 +17,11 @@
 
 ## 解决什么问题
 
-传统新项目上线需要：
+你有台 NAS 或 VPS 放在家里/办公室，没有公网 IP，但想把代码一键部署上去。
 
-1. 在 GitHub 手动创建仓库
-2. 在 Docker Hub 手动创建镜像仓库
-3. 在 GitHub Settings 里逐个填 Secrets
-4. 手写 deploy.yml 流水线
-5. 手写 docker-compose.yml、Dockerfile
-6. 配置 Tailscale + SCP + SSH 部署
+传统做法：手动建 GitHub 仓库 → 手动建 Docker Hub 仓库 → 手动配 Secrets → 手写 CI/CD → 配 Tailscale → 配 SCP → 配 SSH。七个步骤，每一步都可能出错。
 
-**forge 把上面六步压缩成一条命令。**
+**forge 一条命令搞定全部。** Tailscale 隧道穿透内网，GitHub Actions 自动构建镜像、推送到 Docker Hub、SCP 拷贝 compose 文件、SSH 远程拉起容器。你只需要 `git push`。
 
 ## 功能
 
