@@ -193,4 +193,4 @@ GitHub Actions
 
 ## License
 
-MIT — 自由使用、修改、分发。
+[MIT](LICENSE) © [chainlinn](https://github.com/chainlinn)
