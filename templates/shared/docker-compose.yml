@@ -1,0 +1,10 @@
+services:
+  web:
+    image: {{IMAGE_NAME}}
+    pull_policy: always
+    container_name: {{CONTAINER_NAME}}
+    ports:
+      - "{{HOST_PORT}}:{{CONTAINER_PORT}}"
+    volumes:
+      - {{DEPLOY_ROOT}}/{{CONTAINER_NAME}}/data/logs:/var/log/nginx
+    restart: unless-stopped
