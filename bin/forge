@@ -8,13 +8,17 @@ PORT_START="${FORGE_PORT_START:-8889}"
 
 # Template path: Homebrew install → /opt/homebrew/share/forge/templates
 # Local dev → $HOME/.forge/templates
-if [[ -d "${HOMEBREW_PREFIX:-}/share/forge/templates" ]]; then
-    FORGE_TEMPLATES_DIR="${HOMEBREW_PREFIX}/share/forge/templates"
-elif [[ -d "$HOME/.forge/templates" ]]; then
-    FORGE_TEMPLATES_DIR="$HOME/.forge/templates"
-else
-    FORGE_TEMPLATES_DIR="$HOME/.forge/templates"
-fi
+_resolve_templates_dir() {
+    for dir in \
+        "${HOMEBREW_PREFIX:-}/share/forge/templates" \
+        "/opt/homebrew/share/forge/templates" \
+        "/usr/local/share/forge/templates" \
+        "$HOME/.forge/templates"; do
+        if [[ -d "$dir/shared" ]]; then echo "$dir"; return 0; fi
+    done
+    echo "$HOME/.forge/templates"
+}
+FORGE_TEMPLATES_DIR="$(_resolve_templates_dir)"
 
 # Global arrays for secrets
 SECRET_KEYS=()
@@ -22,13 +26,19 @@ SECRET_VALS=()
 
 # Bootstrap templates on first run (outside Homebrew)
 bootstrap_templates() {
-    if [[ -d "$FORGE_TEMPLATES_DIR/shared" ]]; then return 0; fi
+    [[ -d "$FORGE_TEMPLATES_DIR/shared" ]] && return 0
+
     local script_dir parent bundled
     script_dir="$(cd "$(dirname "$0")" && pwd)"
     parent="$(dirname "$script_dir")"
 
-    # Homebrew: ../share/forge/templates  |  dev: ../templates
-    for bundled in "$parent/share/forge/templates" "$parent/templates"; do
+    # Homebrew (installed or linked): ../share/forge/templates
+    # Dev tree: ../templates
+    for bundled in \
+        "$parent/share/forge/templates" \
+        "$parent/templates" \
+        "/opt/homebrew/share/forge/templates" \
+        "/usr/local/share/forge/templates"; do
         if [[ -d "$bundled/shared" ]]; then
             mkdir -p "$FORGE_TEMPLATES_DIR"
             cp -r "$bundled"/* "$FORGE_TEMPLATES_DIR/"
