@@ -1,15 +1,40 @@
+<div align="center">
+
 # forge
 
-CLI 工具，一条命令完成 GitHub 仓库 + Docker Hub 仓库创建、CI/CD Secrets 注册、部署流水线生成。专为 **Tailscale + Docker Compose** 部署架构设计。
+**CLI 工具 — 一条命令创建 GitHub 仓库 + Docker Hub 仓库 + CI/CD 流水线**
 
-![cli init](static/cli_init.gif)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.1.0-6366f1)](https://github.com/chainlinn/forge/releases)
 
-```
-$ forge init my-app          # 创建 GitHub 仓库 + Docker Hub 仓库 + CI/CD
-$ git push origin main       # 触发构建 → 推送镜像 → Tailscale 部署到 NAS
-$ forge sync                 # 更新 Secrets
-$ forge destroy my-app       # 远程容器清理 → 删除仓库 → 删除本地
-```
+[安装](#安装) · [快速开始](#快速开始) · [命令](#命令) · [模板](#模板) · [部署架构](#部署架构)
+
+</div>
+
+---
+
+## 解决什么问题
+
+传统新项目上线需要：
+
+1. 在 GitHub 手动创建仓库
+2. 在 Docker Hub 手动创建镜像仓库
+3. 在 GitHub Settings 里逐个填 Secrets
+4. 手写 deploy.yml 流水线
+5. 手写 docker-compose.yml、Dockerfile
+6. 配置 Tailscale + SCP + SSH 部署
+
+**forge 把上面六步压缩成一条命令。**
+
+## 功能
+
+| 能力 | 说明 |
+|------|------|
+| 仓库创建 | `gh repo create` + Docker Hub repo（`docker push` 自动建） |
+| Secrets 同步 | `.secrets` 全量注册到 GitHub Secrets，`_BASE64` 自动解码 |
+| 脚手架生成 | Dockerfile + compose + deploy.yml + 部署状态页 |
+| 端口管理 | 自动分配/冲突检测/销毁释放，`~/.forge/ports` 追踪 |
+| 一键销毁 | CI 远程清理 NAS 容器 → 删远程仓库 → 删本地目录 |
 
 ## 安装
 
@@ -18,56 +43,50 @@ brew tap chainlinn/tap
 brew install forge-cli
 ```
 
-**前提：** `gh`、`jq`、`curl`、`git` 已安装，且 `gh auth login` 已认证。
+**前提：** `gh`、`jq`、`curl`、`git` 已安装，`gh auth login` 已认证。
 
 ## 快速开始
 
-### 1. 准备凭证文件
-
 ```bash
-mkdir -p ~/.forge/config
-cat > ~/.forge/config/.secrets <<'EOF'
-TS_OAUTH_CLIENT_ID=your_tailscale_client_id
-TS_OAUTH_SECRET=your_tailscale_oauth_secret
-TS_TAGS=tag:ci
-DOCKERHUB_USERNAME=your_dockerhub_username
-DOCKERHUB_TOKEN=your_dockerhub_token
-DEPLOY_HOST=your.nas.host
-DEPLOY_USER=ubuntu
-DEPLOY_SSH_KEY_BASE64=$(base64 < ~/.ssh/id_ed25519)
-DEPLOY_ROOT=/home/ubuntu/deploy/apps
-EOF
-```
+# 1. 准备凭证（一次性）
+mkdir -p ~/.forge/config && cp /path/to/.secrets ~/.forge/config/.secrets
 
-> `_BASE64` 后缀的值在注册 GitHub Secret 时会自动解码。GitHub Secret 收到的是原始 PEM 密钥，不是 base64 字符串。
+# 2. 创建项目
+forge init my-api --port 9000
 
-### 2. 创建项目
-
-```bash
-forge init my-app --port 9000
-```
-
-### 3. 写 Dockerfile 和业务代码
-
-### 4. 推送触发部署
-
-```bash
+# 3. 写 Dockerfile + 业务代码，然后推送
 git push origin main
 ```
 
-GitHub Actions 自动：构建镜像 → 推送到 Docker Hub → Tailscale 连接 NAS → SCP + SSH 部署。
+<details>
+<summary>.secrets 文件格式</summary>
+
+```
+TS_OAUTH_CLIENT_ID=...
+TS_OAUTH_SECRET=...
+TS_TAGS=tag:ci
+DOCKERHUB_USERNAME=...
+DOCKERHUB_TOKEN=...
+DEPLOY_HOST=...
+DEPLOY_USER=ubuntu
+DEPLOY_SSH_KEY_BASE64=$(base64 < ~/.ssh/id_ed25519)
+DEPLOY_ROOT=/home/ubuntu/deploy/apps
+```
+
+> `_BASE64` 后缀的值在注册 GitHub Secret 时自动解码为原始 PEM。
+
+</details>
 
 ## 命令
 
 ### `forge init [name]`
 
-在当前目录创建项目脚手架。带 `name` 参数时先建目录。
+在目标目录生成项目脚手架。
 
 ```bash
-forge init                       # 当前目录，自动分配端口
-forge init my-api                # mkdir ./my-api + 初始化
-forge init my-api --port 9000    # 指定端口
-forge init my-api --visibility public
+forge init                    # 当前目录，自动分配端口
+forge init my-api             # mkdir ./my-api + 初始化
+forge init my-api --port 9000 --visibility public
 ```
 
 **生成文件：**
@@ -76,55 +95,56 @@ forge init my-api --visibility public
 my-api/
 ├── Dockerfile              # nginx:1.27-alpine
 ├── docker-compose.yml      # image + ports + volumes
-├── index.html              # 部署状态页面（timeline 展示全流程）
-├── .gitignore
+├── index.html              # 部署状态页（timeline 展示全流程）
 └── .github/workflows/
     └── deploy.yml          # Build → Push → Tailscale → Deploy
 ```
 
 ### `forge sync`
 
-将本地 `.secrets` 同步到已存在的 GitHub 仓库 Secrets。
+将本地 `.secrets` 增量同步到 GitHub Secrets。
 
 ```bash
-forge sync                          # 自动检测当前 git remote
-forge sync --name owner/repo        # 指定仓库
+forge sync                       # 自动检测当前 git remote
+forge sync --name owner/repo     # 指定仓库
 ```
 
 ### `forge destroy [name]`
 
-三阶段清理：
+三阶段优雅清理：
 
-```
-Phase 1: GitHub Actions 远程清理（SSH 进 NAS → docker compose down → rm -rf）
-Phase 2: 删除 GitHub 仓库 + Docker Hub 仓库
-Phase 3: 删除本地目录
-```
+1. **远程清理** — 通过 GitHub Actions SSH 进 NAS 执行 `docker compose down` + `rm -rf`
+2. **删除仓库** — `gh repo delete` + Docker Hub API delete
+3. **删除本地** — `rm -rf` 项目目录
 
 ```bash
-forge destroy my-api        # 删远程仓库 + rm -rf ./my-api
-forge destroy               # 删除当前目录对应的项目
+forge destroy my-api    # 删远程仓库 + 本地目录
+forge destroy           # 当前目录对应的项目
 ```
 
 ## 选项
 
 | 选项 | 说明 | 默认值 |
 |------|------|--------|
-| `--port PORT` | 宿主机端口映射 | 8889 起自动分配（`FORGE_PORT_START` 可覆盖） |
+| `--port PORT` | 宿主机端口 | 8889 起自动分配 |
 | `--name NAME` | GitHub 仓库名 | 当前目录名 |
 | `--visibility TYPE` | GitHub 仓库可见性 | `private` |
-| `--secrets PATH` | `.secrets` 文件路径 | `~/.forge/config/.secrets` → 回退 `./.secrets` |
+| `--secrets PATH` | `.secrets` 路径 | `~/.forge/config/.secrets` |
+
+`PORT_START` 可通过环境变量覆盖：
+
+```bash
+FORGE_PORT_START=10000 forge init my-api
+```
 
 ## 模板
 
-`forge init` 使用的模板位于：
+`forge init` 从模板目录渲染生成文件。模板使用 `{{变量}}` 占位符。
 
 | 安装方式 | 模板路径 |
 |----------|----------|
 | Homebrew | `/opt/homebrew/share/forge/templates/shared/` |
 | 手动 | `~/.forge/templates/shared/`（首次运行自动 bootstrap） |
-
-可替换模板文件来定制生成内容：
 
 ```
 templates/shared/
@@ -135,32 +155,42 @@ templates/shared/
 └── index.html
 ```
 
-模板使用 `{{变量}}` 占位符：`{{IMAGE_NAME}}` `{{CONTAINER_NAME}}` `{{HOST_PORT}}` `{{CONTAINER_PORT}}` `{{DEPLOY_ROOT}}`。
-
-## 端口管理
-
-端口分配记录在 `~/.forge/ports`，格式 `project:port`。`init` 从 `PORT_START`（默认 8889）起找第一个空闲端口，`destroy` 自动释放。
-
-```bash
-# 自定义起始端口
-FORGE_PORT_START=10000 forge init my-app
-```
+占位符：`{{IMAGE_NAME}}` `{{CONTAINER_NAME}}` `{{HOST_PORT}}` `{{CONTAINER_PORT}}` `{{DEPLOY_ROOT}}`
 
 ## 部署架构
 
 ```
-本地 / CI
-  forge init         → GitHub Repo + Secrets
-  git push           → GitHub Actions 触发
+$ forge init my-api       → GitHub Repo + Secrets + 脚手架
+$ git push origin main    → GitHub Actions 触发
 
 GitHub Actions
-  docker build       → 构建镜像
-  docker push        → Docker Hub
-  tailscale/github-action → 连接 NAS
-  scp-action         → 拷贝 compose 文件
-  ssh-action         → docker compose up -d
+  ├─ docker build + push  → 构建镜像 → Docker Hub
+  ├─ tailscale/github-action → Tailscale 隧道连接 NAS
+  ├─ scp-action           → 拷贝 compose 文件到 $DEPLOY_ROOT
+  └─ ssh-action           → docker compose pull && up -d
 ```
+
+## 技术栈
+
+| 组件 | 用途 |
+|------|------|
+| GitHub CLI (`gh`) | 仓库创建 + Secrets 管理 |
+| GitHub Actions | CI/CD 执行引擎 |
+| Tailscale | 安全隧道连接 NAS |
+| Docker | 构建 + 运行 |
+| Docker Compose | 容器编排 |
+| Docker Hub | 镜像托管 |
+
+## 路线图
+
+- [x] `forge init` — 项目脚手架
+- [x] `forge sync` — Secrets 同步
+- [x] `forge destroy` — 三阶段销毁
+- [x] 端口自动分配与追踪
+- [x] Homebrew 分发
+- [ ] 多模板支持（Go、Python、Node.js）
+- [ ] 交互式 `forge init`（问答式配置）
 
 ## License
 
-MIT
+MIT — 自由使用、修改、分发。
