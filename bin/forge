@@ -23,17 +23,22 @@ SECRET_VALS=()
 # Bootstrap templates on first run (outside Homebrew)
 bootstrap_templates() {
     if [[ -d "$FORGE_TEMPLATES_DIR/shared" ]]; then return 0; fi
-    local bundled
-    bundled="$(cd "$(dirname "$0")" && cd .. && pwd)/share/forge/templates"
-    if [[ -d "$bundled/shared" ]]; then
-        mkdir -p "$FORGE_TEMPLATES_DIR"
-        cp -r "$bundled"/* "$FORGE_TEMPLATES_DIR/"
-    else
-        echo "Error: forge templates not found." >&2
-        echo "  Bundled: $bundled" >&2
-        echo "  Expected: $FORGE_TEMPLATES_DIR" >&2
-        exit 1
-    fi
+    local script_dir parent bundled
+    script_dir="$(cd "$(dirname "$0")" && pwd)"
+    parent="$(dirname "$script_dir")"
+
+    # Homebrew: ../share/forge/templates  |  dev: ../templates
+    for bundled in "$parent/share/forge/templates" "$parent/templates"; do
+        if [[ -d "$bundled/shared" ]]; then
+            mkdir -p "$FORGE_TEMPLATES_DIR"
+            cp -r "$bundled"/* "$FORGE_TEMPLATES_DIR/"
+            return 0
+        fi
+    done
+
+    echo "Error: forge templates not found." >&2
+    echo "  Looked under: $parent" >&2
+    exit 1
 }
 
 # --- helpers ---
