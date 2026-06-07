@@ -61,14 +61,15 @@ jobs:
           ping: ${{ secrets.DEPLOY_HOST }}
           version: latest
 
-      - name: Copy compose file to NAS
+      - name: Copy compose file + hooks to NAS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: docker-compose.yml
+          source: "docker-compose.yml,forge/hooks/*"
           target: ${{ env.APP_DIR }}/docker/compose/
+          strip_components: 0
 
       - name: Deploy via SSH over Tailscale
         uses: appleboy/ssh-action@v1
