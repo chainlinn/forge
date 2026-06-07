@@ -9,8 +9,7 @@ on:
   workflow_dispatch:
 
 env:
-  APP_NAME: ${{ github.event.repository.name }}
-  APP_DIR: {{DEPLOY_ROOT}}/${{ github.event.repository.name }}
+  APP_NAME_RAW: ${{ github.event.repository.name }}
 
 jobs:
   # ── GitHub Runner: Build & Push ──────────────────────────
@@ -19,6 +18,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Sanitize names (Docker Hub requires lowercase)
+        run: |
+          echo "APP_NAME=$(echo '${{ env.APP_NAME_RAW }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          echo "APP_DIR={{DEPLOY_ROOT}}/$(echo '${{ env.APP_NAME_RAW }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v4
@@ -42,6 +46,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Sanitize names
+        run: |
+          echo "APP_NAME=$(echo '${{ env.APP_NAME_RAW }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          echo "APP_DIR={{DEPLOY_ROOT}}/$(echo '${{ env.APP_NAME_RAW }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Connect to Tailscale
         uses: tailscale/github-action@v4

@@ -23,7 +23,7 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             set -e
-            APP_DIR={{DEPLOY_ROOT}}/${{ github.event.repository.name }}
+            APP_DIR={{DEPLOY_ROOT}}/$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')
 
             if [ ! -d "$APP_DIR" ]; then
               echo "Nothing to clean: $APP_DIR does not exist"

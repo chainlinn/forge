@@ -317,7 +317,9 @@ cmd_init() {
     local port
     port=$(port_assign "$repo_name" "$host_port")
 
-    local image_name="$dh_user/$repo_name:dev"
+    local docker_name image_name
+    docker_name=$(echo "$repo_name" | tr '[:upper:]' '[:lower:]')
+    image_name="$dh_user/$docker_name:dev"
 
     # Setup target directory
     echo ""
@@ -339,16 +341,16 @@ cmd_init() {
     mkdir -p .github/workflows
 
     render_template "$tmpl_dir/shared/Dockerfile" "Dockerfile" \
-        "$image_name" "$repo_name" "$port" "$container_port" "$deploy_root"
+        "$image_name" "$docker_name" "$port" "$container_port" "$deploy_root"
 
     render_template "$tmpl_dir/shared/docker-compose.yml" "docker-compose.yml" \
-        "$image_name" "$repo_name" "$port" "$container_port" "$deploy_root"
+        "$image_name" "$docker_name" "$port" "$container_port" "$deploy_root"
 
     render_template "$tmpl_dir/shared/deploy.yml" ".github/workflows/deploy.yml" \
-        "$image_name" "$repo_name" "$port" "$container_port" "$deploy_root"
+        "$image_name" "$docker_name" "$port" "$container_port" "$deploy_root"
 
     render_template "$tmpl_dir/shared/index.html" "index.html" \
-        "$image_name" "$repo_name" "$port" "$container_port" "$deploy_root"
+        "$image_name" "$docker_name" "$port" "$container_port" "$deploy_root"
 
     echo "  Dockerfile"
     echo "  docker-compose.yml"
