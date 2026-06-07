@@ -2,6 +2,8 @@
 
 CLI 工具，一条命令完成 GitHub 仓库 + Docker Hub 仓库创建、CI/CD Secrets 注册、部署流水线生成。专为 **Tailscale + Docker Compose** 部署架构设计。
 
+![cli init](static/cli_init.gif)
+
 ```
 $ forge init my-app          # 创建 GitHub 仓库 + Docker Hub 仓库 + CI/CD
 $ git push origin main       # 触发构建 → 推送镜像 → Tailscale 部署到 NAS
