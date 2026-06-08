@@ -6,5 +6,5 @@ services:
     ports:
       - "{{HOST_PORT}}:{{CONTAINER_PORT}}"
     volumes:
-      - {{DEPLOY_ROOT}}/{{CONTAINER_NAME}}/data/logs:/var/log/nginx
+      - {{DEPLOY_ROOT}}/{{CONTAINER_NAME}}/data:/data
     restart: unless-stopped
