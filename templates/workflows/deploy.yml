@@ -78,7 +78,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "docker-compose.yml,forge/hooks/*"
+          source: "docker-compose.yml,forge/**"
           target: ${{ env.APP_DIR }}/docker/compose/
           strip_components: 0
 
