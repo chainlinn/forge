@@ -9,8 +9,3 @@ jobs:
   deploy:
     uses: chainlinn/forge/.github/workflows/deploy.yml@v0.1.0
     secrets: inherit
-    # 在此添加项目专属环境变量（可选）：
-    # with:
-    #   env: |
-    #     export DOMAIN="$APP_NAME.oneblue.dev"
-    #     export CUSTOM_VAR="value"
