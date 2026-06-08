@@ -2,6 +2,12 @@ name: forge / deploy
 
 on:
   workflow_call:
+    inputs:
+      env:
+        description: "Extra shell exports for hooks (e.g. export DOMAIN=...)"
+        required: false
+        type: string
+        default: ""
 
 env:
   APP_NAME_RAW: ${{ github.event.repository.name }}
@@ -91,6 +97,7 @@ jobs:
             export APP_NAME="${{ env.APP_NAME }}" APP_DIR="${{ env.APP_DIR }}" DATA_DIR="${{ env.APP_DIR }}/data"
             [ -f forge-env ] && source forge-env
             [ -f forge/hooks/config.sh ] && source forge/hooks/config.sh
+            eval '${{ inputs.env }}' 2>/dev/null || true
             mkdir -p "$DATA_DIR"
 
             if [ -f forge/hooks/pre-deploy.sh ]; then
