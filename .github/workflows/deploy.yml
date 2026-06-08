@@ -87,6 +87,7 @@ jobs:
             set -e
             cd ${{ env.APP_DIR }}/docker/compose
             export APP_NAME="${{ env.APP_NAME }}" APP_DIR="${{ env.APP_DIR }}" DATA_DIR="${{ env.APP_DIR }}/data"
+            echo '${{ secrets.FORGE_ENV }}' > /tmp/forge-env && source /tmp/forge-env
             [ -f forge/hooks/env/load-env.sh ] && source forge/hooks/env/load-env.sh
             mkdir -p "$DATA_DIR"
 

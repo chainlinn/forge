@@ -389,6 +389,7 @@ EOF
     echo ""
     echo "=== Registering GitHub Secrets for: $gh_repo ==="
     set_github_secrets "$gh_repo"
+    sync_forge_env "$gh_repo"
 
     # Now push — workflow triggers with secrets available
     echo ""
@@ -410,6 +411,16 @@ EOF
     echo "  Port:          $port"
 }
 
+sync_forge_env() {
+    local repo="$1"
+    local forge_file="$FORGE_CONFIG_DIR/.forge"
+    if [[ -f "$forge_file" ]]; then
+        printf "  %-30s ... " "FORGE_ENV"
+        gh secret set FORGE_ENV --repo "$repo" --body "$(cat "$forge_file")"
+        echo "done"
+    fi
+}
+
 cmd_sync() {
     local repo_name="$2" secrets_file="$1"
 
@@ -429,6 +440,7 @@ cmd_sync() {
     echo ""
     echo "=== Syncing GitHub Secrets for: $gh_repo ==="
     set_github_secrets "$gh_repo"
+    sync_forge_env "$gh_repo"
 
     echo ""
     echo "=== Done ==="

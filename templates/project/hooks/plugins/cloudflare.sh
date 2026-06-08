@@ -1,8 +1,18 @@
 #!/usr/bin/env bash
 # Cloudflare Tunnel route management (source-able library)
-# Requires env: CF_API_TOKEN CF_ACCOUNT_ID CF_TUNNEL_ID CF_ZONE_ID
+# Reads: CF_API_TOKEN CF_ACCOUNT_ID CF_TUNNEL_ID CF_ZONE_ID (via FORGE_ENV)
+
+_cf_check() {
+    for v in CF_API_TOKEN CF_ACCOUNT_ID CF_TUNNEL_ID CF_ZONE_ID; do
+        if [[ -z "${!v:-}" ]]; then
+            echo "Cloudflare: $v not set — add to ~/.forge/config/.forge" >&2
+            return 1
+        fi
+    done
+}
 
 cf_route_add() {
+    _cf_check || return 1
     local hostname="${1:?usage: cf_route_add <hostname> <service>}"
     local service="${2:?usage: cf_route_add <hostname> <service>}"
 
@@ -35,6 +45,7 @@ cf_route_add() {
 }
 
 cf_route_del() {
+    _cf_check || return 1
     local hostname="${1:?usage: cf_route_del <hostname>}"
 
     echo "Cloudflare: removing $hostname"
