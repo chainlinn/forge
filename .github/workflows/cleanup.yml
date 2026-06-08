@@ -32,10 +32,8 @@ jobs:
             fi
 
             cd "$APP_DIR/docker/compose" 2>/dev/null || true
-            export DEPLOY_ROOT='${{ secrets.DEPLOY_ROOT }}'
             export APP_NAME="$(basename "$APP_DIR")" APP_DIR="$APP_DIR"
-            export CF_API_TOKEN='${{ secrets.CF_API_TOKEN }}' CF_ACCOUNT_ID='${{ secrets.CF_ACCOUNT_ID }}' CF_TUNNEL_ID='${{ secrets.CF_TUNNEL_ID }}' CF_ZONE_ID='${{ secrets.CF_ZONE_ID }}'
-
+            [ -f forge-env ] && source forge-env
             [ -f forge/hooks/config.sh ] && source forge/hooks/config.sh
 
             if [ -f forge/hooks/pre-cleanup.sh ]; then

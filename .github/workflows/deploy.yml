@@ -54,6 +54,10 @@ jobs:
           ping: ${{ secrets.DEPLOY_HOST }}
           version: latest
 
+      - name: Dump all secrets to env file (future-proof)
+        run: |
+          echo '${{ toJSON(secrets) }}' | jq -r 'to_entries[] | "export \(.key)=\"\(.value)\""' > forge-env
+
       - name: Ensure app directories exist
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -71,7 +75,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "docker-compose.yml,forge/**"
+          source: "docker-compose.yml,forge/**,forge-env"
           target: ${{ env.APP_DIR }}/docker/compose/
           strip_components: 0
 
@@ -84,10 +88,8 @@ jobs:
           script: |
             set -e
             cd ${{ env.APP_DIR }}/docker/compose
-            export DEPLOY_ROOT='${{ secrets.DEPLOY_ROOT }}'
             export APP_NAME="${{ env.APP_NAME }}" APP_DIR="${{ env.APP_DIR }}" DATA_DIR="${{ env.APP_DIR }}/data"
-            export CF_API_TOKEN='${{ secrets.CF_API_TOKEN }}' CF_ACCOUNT_ID='${{ secrets.CF_ACCOUNT_ID }}' CF_TUNNEL_ID='${{ secrets.CF_TUNNEL_ID }}' CF_ZONE_ID='${{ secrets.CF_ZONE_ID }}'
-
+            [ -f forge-env ] && source forge-env
             [ -f forge/hooks/config.sh ] && source forge/hooks/config.sh
             mkdir -p "$DATA_DIR"
 
