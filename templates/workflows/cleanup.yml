@@ -16,7 +16,7 @@ jobs:
           version: latest
 
       - name: Stop containers and remove deployment
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
@@ -31,9 +31,23 @@ jobs:
             fi
 
             cd "$APP_DIR/docker/compose" 2>/dev/null || true
+            export APP_NAME="$(basename "$APP_DIR")" APP_DIR="$APP_DIR"
+
+            # ── pre-cleanup hook ──
+            if [ -f forge/hooks/pre-cleanup.sh ]; then
+              echo "→ Running pre-cleanup hook..."
+              bash forge/hooks/pre-cleanup.sh
+            fi
+
             if [ -f docker-compose.yml ]; then
               echo "Stopping containers..."
               docker compose down --remove-orphans --volumes 2>/dev/null || true
+            fi
+
+            # ── post-cleanup hook ──
+            if [ -f forge/hooks/post-cleanup.sh ]; then
+              echo "→ Running post-cleanup hook..."
+              bash forge/hooks/post-cleanup.sh
             fi
 
             echo "Removing $APP_DIR..."

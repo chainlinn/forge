@@ -62,7 +62,7 @@ jobs:
           version: latest
 
       - name: Ensure app directories exist (before Docker creates them as root)
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
@@ -83,7 +83,7 @@ jobs:
           strip_components: 0
 
       - name: Deploy via SSH over Tailscale
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
