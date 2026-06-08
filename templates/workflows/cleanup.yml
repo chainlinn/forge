@@ -1,55 +1,8 @@
-name: Forge Cleanup
+name: Cleanup
 
 on: workflow_dispatch
 
 jobs:
   cleanup:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Connect to Tailscale
-        uses: tailscale/github-action@v4
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: ${{ secrets.TS_TAGS }}
-          ping: ${{ secrets.DEPLOY_HOST }}
-          version: latest
-
-      - name: Stop containers and remove deployment
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          script: |
-            set -e
-            APP_DIR={{DEPLOY_ROOT}}/$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')
-
-            if [ ! -d "$APP_DIR" ]; then
-              echo "Nothing to clean: $APP_DIR does not exist"
-              exit 0
-            fi
-
-            cd "$APP_DIR/docker/compose" 2>/dev/null || true
-            export APP_NAME="$(basename "$APP_DIR")" APP_DIR="$APP_DIR"
-
-            # ── pre-cleanup hook ──
-            if [ -f forge/hooks/pre-cleanup.sh ]; then
-              echo "→ Running pre-cleanup hook..."
-              bash forge/hooks/pre-cleanup.sh
-            fi
-
-            if [ -f docker-compose.yml ]; then
-              echo "Stopping containers..."
-              docker compose down --remove-orphans --volumes 2>/dev/null || true
-            fi
-
-            # ── post-cleanup hook ──
-            if [ -f forge/hooks/post-cleanup.sh ]; then
-              echo "→ Running post-cleanup hook..."
-              bash forge/hooks/post-cleanup.sh
-            fi
-
-            echo "Removing $APP_DIR..."
-            rm -rf "$APP_DIR"
-            echo "Deployment cleaned: $APP_DIR"
+    uses: chainlinn/forge/.github/workflows/cleanup.yml@v0.1.0
+    secrets: inherit

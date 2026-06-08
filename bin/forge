@@ -352,8 +352,8 @@ cmd_init() {
     render_template "$tmpl_dir/project/docker-compose.yml" "docker-compose.yml" \
         "$image_name" "$docker_name" "$port" "$container_port" "$deploy_root"
 
-    render_template "$tmpl_dir/workflows/deploy.yml" ".github/workflows/deploy.yml" \
-        "$image_name" "$docker_name" "$port" "$container_port" "$deploy_root"
+    # Thin wrapper — no template vars, reusable workflow does the work
+    cp "$tmpl_dir/workflows/deploy.yml" ".github/workflows/deploy.yml"
 
     if [[ -f "$tmpl_dir/project/index.html" ]]; then
         render_template "$tmpl_dir/project/index.html" "index.html" \
@@ -478,8 +478,7 @@ cmd_destroy() {
         mkdir -p "$target_dir/.github/workflows"
 
         if [[ -f "$tmpl_dir/workflows/cleanup.yml" ]]; then
-            sed "s|{{DEPLOY_ROOT}}|$deploy_root|g" \
-                "$tmpl_dir/workflows/cleanup.yml" > "$target_dir/.github/workflows/cleanup.yml"
+            cp "$tmpl_dir/workflows/cleanup.yml" "$target_dir/.github/workflows/cleanup.yml"
         fi
 
         cd "$target_dir"

@@ -1,0 +1,58 @@
+name: forge / cleanup
+
+on:
+  workflow_call:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: ${{ secrets.TS_TAGS }}
+          ping: ${{ secrets.DEPLOY_HOST }}
+          version: latest
+
+      - name: Stop containers and remove deployment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            APP_DIR=${{ secrets.DEPLOY_ROOT }}/$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')
+
+            if [ ! -d "$APP_DIR" ]; then
+              echo "Nothing to clean: $APP_DIR does not exist"
+              exit 0
+            fi
+
+            cd "$APP_DIR/docker/compose" 2>/dev/null || true
+            export DEPLOY_ROOT='${{ secrets.DEPLOY_ROOT }}'
+            export APP_NAME="$(basename "$APP_DIR")" APP_DIR="$APP_DIR"
+            export CF_API_TOKEN='${{ secrets.CF_API_TOKEN }}' CF_ACCOUNT_ID='${{ secrets.CF_ACCOUNT_ID }}' CF_TUNNEL_ID='${{ secrets.CF_TUNNEL_ID }}' CF_ZONE_ID='${{ secrets.CF_ZONE_ID }}'
+
+            [ -f forge/hooks/config.sh ] && source forge/hooks/config.sh
+
+            if [ -f forge/hooks/pre-cleanup.sh ]; then
+              echo "→ Running pre-cleanup hook..."
+              bash forge/hooks/pre-cleanup.sh
+            fi
+
+            if [ -f docker-compose.yml ]; then
+              echo "Stopping containers..."
+              docker compose down --remove-orphans --volumes 2>/dev/null || true
+            fi
+
+            if [ -f forge/hooks/post-cleanup.sh ]; then
+              echo "→ Running post-cleanup hook..."
+              bash forge/hooks/post-cleanup.sh
+            fi
+
+            echo "Removing $APP_DIR..."
+            rm -rf "$APP_DIR"
+            echo "Deployment cleaned: $APP_DIR"
