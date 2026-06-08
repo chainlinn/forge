@@ -27,6 +27,7 @@
 
 ```bash
 brew tap chainlinn/tap
+brew trust chainlinn/tap
 brew install forge-cli
 ```
 
