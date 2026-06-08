@@ -341,7 +341,7 @@ cmd_init() {
     mkdir -p .github/workflows forge/hooks
 
     # Copy hook scripts
-    local hooks_src="${proj_dir}/hooks"
+    local hooks_src="$tmpl_dir/project/hooks"
     if [[ -d "$hooks_src" ]]; then
         cp "$hooks_src/"* "forge/hooks/" 2>/dev/null || true
     fi
