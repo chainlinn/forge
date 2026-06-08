@@ -1,4 +1,4 @@
-name: Build & Deploy
+name: forge
 
 on:
   push:
@@ -7,5 +7,6 @@ on:
 
 jobs:
   deploy:
+    name: forge-deploy
     uses: chainlinn/forge/.github/workflows/deploy.yml@v0.1.1
     secrets: inherit

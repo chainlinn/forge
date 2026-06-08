@@ -7,7 +7,8 @@ env:
   APP_NAME_RAW: ${{ github.event.repository.name }}
 
 jobs:
-  build:
+  forge-build:
+    name: forge-build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -33,8 +34,9 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.APP_NAME }}:dev
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
 
-  deploy:
-    needs: build
+  forge-deploy:
+    name: forge-deploy
+    needs: forge-build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
