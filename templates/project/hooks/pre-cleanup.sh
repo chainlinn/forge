@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# pre-cleanup hook — 在 NAS 上 docker compose down 之前执行
-# 工作目录: $APP_DIR/docker/compose
-# 可用变量: APP_NAME, APP_DIR
+# pre-cleanup hook — docker compose down 之前执行
+# 环境变量: APP_NAME, APP_DIR
 set -euo pipefail
+DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# 在此处添加清理前逻辑
-# 例如：备份数据库、通知外部服务
+# ── 示例：从 Cloudflare Tunnel 下架 ──
+# source "$DIR/lib/cloudflare.sh"
+# cf_route_del "$APP_NAME.oneblue.dev"
+
+# ── 在此处添加清理前逻辑 ──
