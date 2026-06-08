@@ -43,7 +43,7 @@ jobs:
 
             if [ -f docker-compose.yml ]; then
               echo "Stopping containers..."
-              docker compose down --remove-orphans --volumes 2>/dev/null || true
+              docker compose -p "$APP_NAME" down --remove-orphans --volumes 2>/dev/null || true
             fi
 
             if [ -f forge/hooks/events/post-cleanup.sh ]; then

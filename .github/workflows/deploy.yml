@@ -97,9 +97,9 @@ jobs:
             fi
 
             printf '%s' '${{ secrets.DOCKERHUB_TOKEN }}' | docker login -u '${{ secrets.DOCKERHUB_USERNAME }}' --password-stdin
-            docker compose pull
-            docker compose up -d --remove-orphans
-            docker compose ps
+            docker compose -p "$APP_NAME" pull
+            docker compose -p "$APP_NAME" up -d --remove-orphans
+            docker compose -p "$APP_NAME" ps
 
             if [ -f forge/hooks/events/post-deploy.sh ]; then
               echo "→ Running post-deploy hook..."
