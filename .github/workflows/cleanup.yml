@@ -35,9 +35,9 @@ jobs:
             export APP_NAME="$(basename "$APP_DIR")" APP_DIR="$APP_DIR"
             [ -f forge/hooks/load-env.sh ] && source forge/hooks/load-env.sh
 
-            if [ -f forge/hooks/pre-cleanup.sh ]; then
+            if [ -f forge/hooks/events/pre-cleanup.sh ]; then
               echo "→ Running pre-cleanup hook..."
-              bash forge/hooks/pre-cleanup.sh
+              bash forge/hooks/events/pre-cleanup.sh
             fi
 
             if [ -f docker-compose.yml ]; then
@@ -45,9 +45,9 @@ jobs:
               docker compose down --remove-orphans --volumes 2>/dev/null || true
             fi
 
-            if [ -f forge/hooks/post-cleanup.sh ]; then
+            if [ -f forge/hooks/events/post-cleanup.sh ]; then
               echo "→ Running post-cleanup hook..."
-              bash forge/hooks/post-cleanup.sh
+              bash forge/hooks/events/post-cleanup.sh
             fi
 
             echo "Removing $APP_DIR..."

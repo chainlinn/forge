@@ -85,12 +85,12 @@ jobs:
             set -e
             cd ${{ env.APP_DIR }}/docker/compose
             export APP_NAME="${{ env.APP_NAME }}" APP_DIR="${{ env.APP_DIR }}" DATA_DIR="${{ env.APP_DIR }}/data"
-            [ -f forge/hooks/load-env.sh ] && source forge/hooks/load-env.sh
+            [ -f forge/hooks/env/load-env.sh ] && source forge/hooks/env/load-env.sh
             mkdir -p "$DATA_DIR"
 
-            if [ -f forge/hooks/pre-deploy.sh ]; then
+            if [ -f forge/hooks/events/pre-deploy.sh ]; then
               echo "→ Running pre-deploy hook..."
-              bash forge/hooks/pre-deploy.sh
+              bash forge/hooks/events/pre-deploy.sh
             fi
 
             printf '%s' '${{ secrets.DOCKERHUB_TOKEN }}' | docker login -u '${{ secrets.DOCKERHUB_USERNAME }}' --password-stdin
@@ -98,7 +98,7 @@ jobs:
             docker compose up -d --remove-orphans
             docker compose ps
 
-            if [ -f forge/hooks/post-deploy.sh ]; then
+            if [ -f forge/hooks/events/post-deploy.sh ]; then
               echo "→ Running post-deploy hook..."
-              bash forge/hooks/post-deploy.sh
+              bash forge/hooks/events/post-deploy.sh
             fi

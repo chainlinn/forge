@@ -343,7 +343,7 @@ cmd_init() {
     # Copy hook scripts
     local hooks_src="$tmpl_dir/project/hooks"
     if [[ -d "$hooks_src" ]]; then
-        cp "$hooks_src/"* "forge/hooks/" 2>/dev/null || true
+        cp -r "$hooks_src/"* "forge/hooks/" 2>/dev/null || true
     fi
 
     render_template "$tmpl_dir/project/Dockerfile" "Dockerfile" \
