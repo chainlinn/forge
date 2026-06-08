@@ -5,11 +5,11 @@
 **通过 GitHub Actions + Tailscale 安全隧道，一键将代码部署到你的私有服务器。**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.0-6366f1)](https://github.com/chainlinn/forge/releases)
+[![Version](https://img.shields.io/badge/version-0.1.1-6366f1)](https://github.com/chainlinn/forge/releases)
 
 ![demo](static/demo.gif)
 
-[安装](#安装) · [快速开始](#快速开始) · [命令](#命令) · [模板](#模板) · [部署架构](#部署架构)
+[安装](#安装) · [快速开始](#快速开始) · [命令](#命令) · [架构](#架构) · [钩子系统](#钩子系统)
 
 </div>
 
@@ -23,17 +23,6 @@
 
 **forge 一条命令搞定全部。** Tailscale 隧道穿透内网，GitHub Actions 自动构建镜像、推送到 Docker Hub、SCP 拷贝 compose 文件、SSH 远程拉起容器。你只需要 `git push`。
 
-## 功能
-
-| 能力 | 说明 |
-|------|------|
-| 仓库创建 | `gh repo create` + Docker Hub repo（`docker push` 自动建） |
-| Secrets 同步 | `.secrets` 全量注册到 GitHub Secrets，`_BASE64` 自动解码 |
-| 脚手架生成 | Dockerfile + compose + deploy.yml + 钩子脚本 + 状态页 |
-| 生命周期钩子 | `forge/hooks/{pre,post}-deploy.sh`，deploy.yml 永不需修改 |
-| 端口管理 | 自动分配/冲突检测/销毁释放，`~/.forge/ports` 追踪 |
-| 一键销毁 | CI 远程清理 NAS 容器 → 删远程仓库 → 删本地目录 |
-
 ## 安装
 
 ```bash
@@ -41,7 +30,7 @@ brew tap chainlinn/tap
 brew install forge-cli
 ```
 
-**前提：** `gh`、`jq`、`curl`、`git` 已安装，`gh auth login` 已认证。
+前提：`gh` `jq` `curl` `git` 已安装，`gh auth login` 已认证。
 
 ## 快速开始
 
@@ -52,34 +41,13 @@ mkdir -p ~/.forge/config && cp /path/to/.secrets ~/.forge/config/.secrets
 # 2. 创建项目
 forge init my-api --port 9000
 
-# 3. 写 Dockerfile + 业务代码，然后推送
+# 3. 推送 → 自动构建、推送镜像、部署到 NAS
 git push origin main
 ```
-
-<details>
-<summary>.secrets 文件格式</summary>
-
-```
-TS_OAUTH_CLIENT_ID=...
-TS_OAUTH_SECRET=...
-TS_TAGS=tag:ci
-DOCKERHUB_USERNAME=...
-DOCKERHUB_TOKEN=...
-DEPLOY_HOST=...
-DEPLOY_USER=ubuntu
-DEPLOY_SSH_KEY_BASE64=$(base64 < ~/.ssh/id_ed25519)
-DEPLOY_ROOT=/home/ubuntu/deploy/apps
-```
-
-> `_BASE64` 后缀的值在注册 GitHub Secret 时自动解码为原始 PEM。
-
-</details>
 
 ## 命令
 
 ### `forge init [name]`
-
-在目标目录生成项目脚手架。
 
 ```bash
 forge init                    # 当前目录，自动分配端口
@@ -87,41 +55,70 @@ forge init my-api             # mkdir ./my-api + 初始化
 forge init my-api --port 9000 --visibility public
 ```
 
-**生成文件：**
-
-```
-my-api/
-├── Dockerfile
-├── docker-compose.yml
-├── index.html              # 部署状态页
-├── forge/hooks/
-│   ├── pre-deploy.sh       # 部署前钩子（NAS 端执行）
-│   └── post-deploy.sh      # 部署后钩子
-└── .github/workflows/
-    └── deploy.yml          # Build → Push → Tailscale → Deploy（调用 hooks）
-```
-
 ### `forge sync`
 
-将本地 `.secrets` 增量同步到 GitHub Secrets。
+将 `.secrets` 同步到 GitHub Secrets。
 
 ```bash
 forge sync                       # 自动检测当前 git remote
-forge sync --name owner/repo     # 指定仓库
+forge sync --name owner/repo
 ```
 
 ### `forge destroy [name]`
 
-三阶段优雅清理：
-
-1. **远程清理** — 通过 GitHub Actions SSH 进 NAS 执行 `docker compose down` + `rm -rf`
-2. **删除仓库** — `gh repo delete` + Docker Hub API delete
-3. **删除本地** — `rm -rf` 项目目录
+四阶段清理：Cloudflare 下架 → NAS 清理 → 远程仓库 → 本地目录。
 
 ```bash
-forge destroy my-api    # 删远程仓库 + 本地目录
-forge destroy           # 当前目录对应的项目
+forge destroy my-api
+forge destroy
 ```
+
+## 架构
+
+```
+项目                forge 仓库（逻辑集中维护）
+
+.github/workflows/
+  deploy.yml  ───→  chainlinn/forge/.github/workflows/deploy.yml@v0.1.1
+  cleanup.yml ───→  chainlinn/forge/.github/workflows/cleanup.yml@v0.1.1
+                   secrets: inherit  # 全量透传，零配置
+```
+
+deploy.yml 只有 9 行，永不修改。升级 forge 改 tag 即可。
+
+## 钩子系统
+
+```
+forge/hooks/
+├── env/
+│   └── load-env.sh          # 环境变量（默认值 + 非敏感导出）
+├── events/
+│   ├── pre-deploy.sh        # 部署前
+│   ├── post-deploy.sh       # 部署后
+│   ├── pre-cleanup.sh       # 销毁前
+│   └── post-cleanup.sh      # 销毁后
+└── plugins/
+    └── cloudflare.sh        # Cloudflare Tunnel 路由管理
+```
+
+所有钩子在 NAS 上执行，`secrets: inherit` 全量透传 GitHub Secrets。
+
+**添加 Cloudflare 公网发布：**
+
+1. `.secrets` 加 `CF_API_TOKEN` `CF_ACCOUNT_ID` `CF_TUNNEL_ID` `CF_ZONE_ID`
+2. `env/load-env.sh` 加 `export DOMAIN="$APP_NAME.oneblue.dev"`
+3. `events/post-deploy.sh` 取消注释：
+   ```bash
+   source "$DIR/../plugins/cloudflare.sh"
+   cf_route_add "$DOMAIN" "http://localhost:<端口>"
+   ```
+4. `events/pre-cleanup.sh` 取消注释：
+   ```bash
+   source "$DIR/../plugins/cloudflare.sh"
+   cf_route_del "$DOMAIN"
+   ```
+
+`forge sync` 一次，后续所有项目自动生效。
 
 ## 选项
 
@@ -140,57 +137,39 @@ FORGE_PORT_START=10000 forge init my-api
 
 ## 模板
 
-`forge init` 从模板目录渲染生成文件。模板使用 `{{变量}}` 占位符。
+`forge init` 从模板目录渲染生成文件。占位符：`{{IMAGE_NAME}}` `{{CONTAINER_NAME}}` `{{HOST_PORT}}` `{{CONTAINER_PORT}}` `{{DEPLOY_ROOT}}`。
 
 | 安装方式 | 模板路径 |
 |----------|----------|
-| Homebrew | `/opt/homebrew/share/forge/templates/shared/` |
-| 手动 | `~/.forge/templates/shared/`（首次运行自动 bootstrap） |
+| Homebrew | `/opt/homebrew/share/forge/templates/` |
+| 手动 | `~/.forge/templates/`（首次运行自动 bootstrap） |
 
 ```
-templates/shared/
-├── Dockerfile
-├── docker-compose.yml
-├── deploy.yml
-├── cleanup.yml
-└── index.html
-```
-
-占位符：`{{IMAGE_NAME}}` `{{CONTAINER_NAME}}` `{{HOST_PORT}}` `{{CONTAINER_PORT}}` `{{DEPLOY_ROOT}}`
-
-## 部署架构
-
-```
-$ forge init my-api       → GitHub Repo + Secrets + 脚手架
-$ git push origin main    → GitHub Actions 触发
-
-GitHub Actions
-  ├─ docker build + push  → 构建镜像 → Docker Hub
-  ├─ tailscale/github-action → Tailscale 隧道连接 NAS
-  ├─ scp-action           → 拷贝 compose 文件到 $DEPLOY_ROOT
-  └─ ssh-action           → docker compose pull && up -d
+templates/
+├── project/              # Dockerfile, compose, index.html, hooks/
+└── workflows/            # deploy.yml, cleanup.yml（薄封装）
 ```
 
 ## 技术栈
 
 | 组件 | 用途 |
 |------|------|
-| GitHub CLI (`gh`) | 仓库创建 + Secrets 管理 |
-| GitHub Actions | CI/CD 执行引擎 |
+| GitHub CLI | 仓库创建 + Secrets 管理 |
+| GitHub Actions | CI/CD（reusable workflow） |
 | Tailscale | 安全隧道连接 NAS |
-| Docker | 构建 + 运行 |
-| Docker Compose | 容器编排 |
+| Docker + Compose | 构建、推送、运行 |
 | Docker Hub | 镜像托管 |
 
 ## 路线图
 
 - [x] `forge init` — 项目脚手架
 - [x] `forge sync` — Secrets 同步
-- [x] `forge destroy` — 三阶段销毁
+- [x] `forge destroy` — 多阶段销毁
 - [x] 端口自动分配与追踪
+- [x] 生命周期钩子（env / events / plugins）
+- [x] Reusable workflow 架构
 - [x] Homebrew 分发
 - [ ] 多模板支持（Go、Python、Node.js）
-- [ ] 交互式 `forge init`（问答式配置）
 
 ## License
 
