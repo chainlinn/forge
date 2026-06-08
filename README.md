@@ -5,7 +5,7 @@
 **通过 GitHub Actions + Tailscale 安全隧道，一键将代码部署到你的私有服务器。**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.1-6366f1)](https://github.com/chainlinn/forge/releases)
+[![Version](https://img.shields.io/badge/version-0.1.3-6366f1)](https://github.com/chainlinn/forge/releases)
 
 ![demo](static/demo.gif)
 
@@ -80,8 +80,8 @@ forge destroy
 项目                forge 仓库（逻辑集中维护）
 
 .github/workflows/
-  deploy.yml  ───→  chainlinn/forge/.github/workflows/deploy.yml@v0.1.1
-  cleanup.yml ───→  chainlinn/forge/.github/workflows/cleanup.yml@v0.1.1
+  deploy.yml  ───→  chainlinn/forge/.github/workflows/deploy.yml@v0.1.3
+  cleanup.yml ───→  chainlinn/forge/.github/workflows/cleanup.yml@v0.1.3
                    secrets: inherit  # 全量透传，零配置
 ```
 
@@ -104,9 +104,28 @@ forge/hooks/
 
 所有钩子在 NAS 上执行，`secrets: inherit` 全量透传 GitHub Secrets。
 
+**插件变量（FORGE_ENV）：**
+
+```
+~/.forge/config/
+├── .secrets          # 主流程：DEPLOY_HOST, DOCKERHUB_TOKEN, TS_*
+└── .forge            # 插件变量 → FORGE_ENV GitHub Secret
+```
+
+`.forge` 内容示例：
+```
+CF_API_TOKEN=xxx
+CF_ACCOUNT_ID=xxx
+CF_TUNNEL_ID=xxx
+CF_ZONE_ID=xxx
+SLACK_WEBHOOK=https://...
+```
+
+`forge sync` 自动将 `.forge` 写入 `FORGE_ENV` GitHub Secret。deploy 时注入 NAS 的 `/tmp/forge-env`，所有 hook 可直接引用 `$CF_API_TOKEN`、`$SLACK_WEBHOOK`。新增插件变量只改 `.forge` 一行，workflow 零改动。
+
 **添加 Cloudflare 公网发布：**
 
-1. `.secrets` 加 `CF_API_TOKEN` `CF_ACCOUNT_ID` `CF_TUNNEL_ID` `CF_ZONE_ID`
+1. `.forge` 加 `CF_API_TOKEN` `CF_ACCOUNT_ID` `CF_TUNNEL_ID` `CF_ZONE_ID`
 2. `env/load-env.sh` 加 `export DOMAIN="$APP_NAME.oneblue.dev"`
 3. `events/post-deploy.sh` 取消注释：
    ```bash
@@ -118,8 +137,7 @@ forge/hooks/
    source "$DIR/../plugins/cloudflare.sh"
    cf_route_del "$DOMAIN"
    ```
-
-`forge sync` 一次，后续所有项目自动生效。
+5. `forge sync`
 
 ## 选项
 
