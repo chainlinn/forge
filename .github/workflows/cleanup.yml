@@ -33,7 +33,6 @@ jobs:
 
             cd "$APP_DIR/docker/compose" 2>/dev/null || true
             export APP_NAME="$(basename "$APP_DIR")" APP_DIR="$APP_DIR"
-            [ -f forge-env ] && source forge-env
             [ -f forge/hooks/config.sh ] && source forge/hooks/config.sh
 
             if [ -f forge/hooks/pre-cleanup.sh ]; then
