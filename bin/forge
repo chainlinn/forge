@@ -313,14 +313,6 @@ cmd_init() {
         exit 1
     fi
 
-    # brew installs flat; dev tree has project/ subdir
-    local proj_dir
-    if [[ -d "$tmpl_dir/project" ]]; then
-        proj_dir="$tmpl_dir/project"
-    else
-        proj_dir="$tmpl_dir"
-    fi
-
     local container_port=80
     local port
     port=$(port_assign "$repo_name" "$host_port")
@@ -354,24 +346,24 @@ cmd_init() {
         cp "$hooks_src/"* "forge/hooks/" 2>/dev/null || true
     fi
 
-    render_template "$proj_dir/Dockerfile" "Dockerfile" \
+    render_template "$tmpl_dir/project/Dockerfile" "Dockerfile" \
         "$image_name" "$docker_name" "$port" "$container_port" "$deploy_root"
 
-    render_template "$proj_dir/docker-compose.yml" "docker-compose.yml" \
+    render_template "$tmpl_dir/project/docker-compose.yml" "docker-compose.yml" \
         "$image_name" "$docker_name" "$port" "$container_port" "$deploy_root"
 
     render_template "$tmpl_dir/workflows/deploy.yml" ".github/workflows/deploy.yml" \
         "$image_name" "$docker_name" "$port" "$container_port" "$deploy_root"
 
-    if [[ -f "$proj_dir/index.html" ]]; then
-        render_template "$proj_dir/index.html" "index.html" \
+    if [[ -f "$tmpl_dir/project/index.html" ]]; then
+        render_template "$tmpl_dir/project/index.html" "index.html" \
             "$image_name" "$docker_name" "$port" "$container_port" "$deploy_root"
     fi
 
     echo "  Dockerfile"
     echo "  docker-compose.yml"
     echo "  .github/workflows/deploy.yml"
-    [[ -f "$proj_dir/index.html" ]] && echo "  index.html"
+    [[ -f "$tmpl_dir/project/index.html" ]] && echo "  index.html"
 
     # Init git + commit
     echo ""
