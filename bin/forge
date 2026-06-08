@@ -14,7 +14,7 @@ _resolve_templates_dir() {
         "/opt/homebrew/share/forge/templates" \
         "/usr/local/share/forge/templates" \
         "$HOME/.forge/templates"; do
-        if [[ -d "$dir/shared" ]]; then echo "$dir"; return 0; fi
+        if [[ -d "$dir/workflows" ]]; then echo "$dir"; return 0; fi
     done
     echo "$HOME/.forge/templates"
 }
@@ -26,7 +26,7 @@ SECRET_VALS=()
 
 # Bootstrap templates on first run (outside Homebrew)
 bootstrap_templates() {
-    [[ -d "$FORGE_TEMPLATES_DIR/shared" ]] && return 0
+    [[ -d "$FORGE_TEMPLATES_DIR/workflows" ]] && return 0
 
     local script_dir parent bundled
     script_dir="$(cd "$(dirname "$0")" && pwd)"
@@ -39,7 +39,7 @@ bootstrap_templates() {
         "$parent/templates" \
         "/opt/homebrew/share/forge/templates" \
         "/usr/local/share/forge/templates"; do
-        if [[ -d "$bundled/shared" ]]; then
+        if [[ -d "$bundled/workflows" ]]; then
             mkdir -p "$FORGE_TEMPLATES_DIR"
             cp -r "$bundled"/* "$FORGE_TEMPLATES_DIR/"
             return 0
@@ -308,9 +308,17 @@ cmd_init() {
 
     local tmpl_dir="$FORGE_TEMPLATES_DIR"
     bootstrap_templates
-    if [[ ! -d "$tmpl_dir/shared" ]]; then
-        echo "Error: shared templates not found in $tmpl_dir" >&2
+    if [[ ! -d "$tmpl_dir/workflows" ]]; then
+        echo "Error: templates not found in $tmpl_dir" >&2
         exit 1
+    fi
+
+    # brew installs flat; dev tree has project/ subdir
+    local proj_dir
+    if [[ -d "$tmpl_dir/project" ]]; then
+        proj_dir="$tmpl_dir/project"
+    else
+        proj_dir="$tmpl_dir"
     fi
 
     local container_port=80
@@ -340,27 +348,30 @@ cmd_init() {
 
     mkdir -p .github/workflows forge/hooks
 
-    # Copy hook scripts (not templated — user edits them later)
-    if [[ -d "$tmpl_dir/shared/forge/hooks" ]]; then
-        cp "$tmpl_dir/shared/forge/hooks/"* "forge/hooks/" 2>/dev/null || true
+    # Copy hook scripts
+    local hooks_src="${proj_dir}/hooks"
+    if [[ -d "$hooks_src" ]]; then
+        cp "$hooks_src/"* "forge/hooks/" 2>/dev/null || true
     fi
 
-    render_template "$tmpl_dir/shared/Dockerfile" "Dockerfile" \
+    render_template "$proj_dir/Dockerfile" "Dockerfile" \
         "$image_name" "$docker_name" "$port" "$container_port" "$deploy_root"
 
-    render_template "$tmpl_dir/shared/docker-compose.yml" "docker-compose.yml" \
+    render_template "$proj_dir/docker-compose.yml" "docker-compose.yml" \
         "$image_name" "$docker_name" "$port" "$container_port" "$deploy_root"
 
-    render_template "$tmpl_dir/shared/deploy.yml" ".github/workflows/deploy.yml" \
+    render_template "$tmpl_dir/workflows/deploy.yml" ".github/workflows/deploy.yml" \
         "$image_name" "$docker_name" "$port" "$container_port" "$deploy_root"
 
-    render_template "$tmpl_dir/shared/index.html" "index.html" \
-        "$image_name" "$docker_name" "$port" "$container_port" "$deploy_root"
+    if [[ -f "$proj_dir/index.html" ]]; then
+        render_template "$proj_dir/index.html" "index.html" \
+            "$image_name" "$docker_name" "$port" "$container_port" "$deploy_root"
+    fi
 
     echo "  Dockerfile"
     echo "  docker-compose.yml"
     echo "  .github/workflows/deploy.yml"
-    echo "  index.html"
+    [[ -f "$proj_dir/index.html" ]] && echo "  index.html"
 
     # Init git + commit
     echo ""
@@ -474,9 +485,9 @@ cmd_destroy() {
 
         mkdir -p "$target_dir/.github/workflows"
 
-        if [[ -f "$tmpl_dir/shared/cleanup.yml" ]]; then
+        if [[ -f "$tmpl_dir/workflows/cleanup.yml" ]]; then
             sed "s|{{DEPLOY_ROOT}}|$deploy_root|g" \
-                "$tmpl_dir/shared/cleanup.yml" > "$target_dir/.github/workflows/cleanup.yml"
+                "$tmpl_dir/workflows/cleanup.yml" > "$target_dir/.github/workflows/cleanup.yml"
         fi
 
         cd "$target_dir"
