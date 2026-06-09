@@ -16,19 +16,25 @@ cf_route_add() {
     local hostname="${1:?usage: cf_route_add <hostname> <service>}"
     local service="${2:?usage: cf_route_add <hostname> <service>}"
 
+    # Skip if hostname already routed
+    local ingress existing
+    ingress=$(curl -s "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/cfd_tunnel/$CF_TUNNEL_ID/configurations" \
+        -H "Authorization: Bearer $CF_API_TOKEN")
+    existing=$(echo "$ingress" | jq -r --arg h "$hostname" '.result.config.ingress[]? | select(.hostname == $h) | .hostname')
+    if [[ "$existing" == "$hostname" ]]; then
+        echo "Cloudflare: $hostname already routed, skip"
+        return 0
+    fi
+
     echo "Cloudflare: $hostname → $service"
 
     local updated
-    updated=$(curl -s \
-        "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/cfd_tunnel/$CF_TUNNEL_ID/configurations" \
-        -H "Authorization: Bearer $CF_API_TOKEN" | \
-        jq --arg h "$hostname" --arg s "$service" '
-            .result.config.ingress
-            | map(select(.hostname))
-            + [{"hostname": $h, "service": $s}]
-            + [{"service": "http_status:404"}]
-            | {"config": {"ingress": .}}
-        ')
+    updated=$(echo "$ingress" | jq --arg h "$hostname" --arg s "$service" '
+        .result.config.ingress
+        | map(select(.hostname))
+        + [{"hostname": $h, "service": $s}]
+        + [{"service": "http_status:404"}]
+        | {"config": {"ingress": .}}')
 
     curl -s -X PUT \
         "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/cfd_tunnel/$CF_TUNNEL_ID/configurations" \
@@ -50,11 +56,10 @@ cf_route_del() {
 
     echo "Cloudflare: removing $hostname"
 
-    local updated
-    updated=$(curl -s \
-        "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/cfd_tunnel/$CF_TUNNEL_ID/configurations" \
-        -H "Authorization: Bearer $CF_API_TOKEN" | \
-        jq --arg h "$hostname" '.result.config.ingress | map(select(.hostname != $h)) | {"config": {"ingress": .}}')
+    local ingress updated
+    ingress=$(curl -s "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/cfd_tunnel/$CF_TUNNEL_ID/configurations" \
+        -H "Authorization: Bearer $CF_API_TOKEN")
+    updated=$(echo "$ingress" | jq --arg h "$hostname" '.result.config.ingress | map(select(.hostname != $h)) | {"config": {"ingress": .}}')
 
     curl -s -X PUT \
         "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/cfd_tunnel/$CF_TUNNEL_ID/configurations" \
