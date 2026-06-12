@@ -8,5 +8,5 @@ on:
 jobs:
   deploy:
     name: forge-deploy
-    uses: chainlinn/forge/.github/workflows/deploy.yml@v0.1.12
+    uses: chainlinn/forge/.github/workflows/deploy.yml@v0.1.13
     secrets: inherit
