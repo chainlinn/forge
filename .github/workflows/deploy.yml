@@ -9,12 +9,44 @@ on:
         description: "Caller's repository name (github.event.repository.name)"
 
 jobs:
-  forge-build:
-    name: forge-build
+  # ── Build amd64 on standard runner ──
+  forge-build-amd64:
+    name: forge-build-amd64
     runs-on: ubuntu-latest
+    outputs:
+      app_name: ${{ steps.name.outputs.APP_NAME }}
     steps:
       - uses: actions/checkout@v6
-      - name: Sanitize name
+      - name: Sanitize
+        id: name
+        run: |
+          echo "APP_NAME=$(echo '${{ inputs.repo }}' | tr '[:upper:]' '[:lower:]')" | tee -a "$GITHUB_OUTPUT" "$GITHUB_ENV"
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver: docker-container
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          provenance: false
+          cache-from: type=gha,scope=amd64
+          cache-to: type=gha,mode=max,scope=amd64
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.APP_NAME }}:dev-amd64
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}-amd64
+
+  # ── Build arm64 on native ARM runner ──
+  forge-build-arm64:
+    name: forge-build-arm64
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v6
+      - name: Sanitize
         run: |
           echo "APP_NAME=$(echo '${{ inputs.repo }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
       - uses: docker/login-action@v4
@@ -28,22 +60,46 @@ jobs:
         with:
           context: .
           push: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          platforms: linux/arm64
+          provenance: false
+          cache-from: type=gha,scope=arm64
+          cache-to: type=gha,mode=max,scope=arm64
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.APP_NAME }}:dev
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.APP_NAME }}:dev-arm64
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}-arm64
 
+  # ── Merge manifests → unified :dev and :sha tags ──
+  forge-merge:
+    name: forge-merge
+    runs-on: ubuntu-latest
+    needs: [forge-build-amd64, forge-build-arm64]
+    outputs:
+      app_name: ${{ steps.name.outputs.APP_NAME }}
+    steps:
+      - name: Resolve name
+        id: name
+        run: |
+          echo "APP_NAME=${{ needs.forge-build-amd64.outputs.app_name }}" | tee -a "$GITHUB_OUTPUT" "$GITHUB_ENV"
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Merge manifests
+        run: |
+          IMG="${{ secrets.DOCKERHUB_USERNAME }}/${{ env.APP_NAME }}"
+          docker buildx imagetools create -t "$IMG:dev" -t "$IMG:${{ github.sha }}" \
+            "$IMG:dev-amd64" "$IMG:dev-arm64"
+
+  # ── Deploy ──
   forge-deploy:
     name: forge-deploy
-    needs: forge-build
+    needs: forge-merge
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Sanitize name
-        run: |
-          echo "APP_NAME=$(echo '${{ inputs.repo }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-          echo "APP_DIR=${{ secrets.DEPLOY_ROOT }}/$(echo '${{ inputs.repo }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+      - run: |
+          echo "APP_NAME=${{ needs.forge-merge.outputs.app_name }}" >> $GITHUB_ENV
+          echo "APP_DIR=${{ secrets.DEPLOY_ROOT }}/${{ needs.forge-merge.outputs.app_name }}" >> $GITHUB_ENV
       - uses: tailscale/github-action@v4
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
