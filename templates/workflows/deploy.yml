@@ -8,7 +8,7 @@ on:
 jobs:
   deploy:
     name: forge-deploy
-    uses: chainlinn/forge/.github/workflows/deploy.yml@v0.1.19
+    uses: chainlinn/forge/.github/workflows/deploy.yml@v0.1.20
     secrets: inherit
     with:
       repo: ${{ github.event.repository.name }}
