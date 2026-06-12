@@ -7,14 +7,56 @@ env:
   APP_NAME_RAW: ${{ github.event.repository.name }}
 
 jobs:
-  forge-build:
-    name: forge-build
+  # ── Build amd64 on standard runner ──
+  forge-build-amd64:
+    name: forge-build-amd64
     runs-on: ubuntu-latest
+    outputs:
+      app_name: ${{ steps.sanitize.outputs.APP_NAME }}
+      app_dir: ${{ steps.sanitize.outputs.APP_DIR }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Sanitize names (Docker Hub requires lowercase)
+      - name: Sanitize names
+        id: sanitize
+        run: |
+          echo "APP_NAME=$(echo '${{ env.APP_NAME_RAW }}' | tr '[:upper:]' '[:lower:]')" | tee -a "$GITHUB_OUTPUT" "$GITHUB_ENV"
+          echo "APP_DIR=${{ secrets.DEPLOY_ROOT }}/$(echo '${{ env.APP_NAME_RAW }}' | tr '[:upper:]' '[:lower:]')" | tee -a "$GITHUB_OUTPUT" "$GITHUB_ENV"
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+          driver: docker-container
+
+      - name: Build and push amd64
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          provenance: false
+          cache-from: type=gha,scope=amd64
+          cache-to: type=gha,mode=max,scope=amd64
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.APP_NAME }}:dev-amd64
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}-amd64
+
+  # ── Build arm64 on native ARM runner ──
+  forge-build-arm64:
+    name: forge-build-arm64
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Sanitize names
         run: |
           echo "APP_NAME=$(echo '${{ env.APP_NAME_RAW }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
           echo "APP_DIR=${{ secrets.DEPLOY_ROOT }}/$(echo '${{ env.APP_NAME_RAW }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
@@ -25,29 +67,56 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
         with:
           driver: docker-container
 
-      - name: Build and push Docker image
+      - name: Build and push arm64
         uses: docker/build-push-action@v7
         with:
           context: .
           push: true
-          platforms: linux/amd64,linux/arm64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          platforms: linux/arm64
+          provenance: false
+          cache-from: type=gha,scope=arm64
+          cache-to: type=gha,mode=max,scope=arm64
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.APP_NAME }}:dev
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.APP_NAME }}:dev-arm64
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}-arm64
 
+  # ── Merge manifests → unified :dev and :sha tags ──
+  forge-merge:
+    name: forge-merge
+    runs-on: ubuntu-latest
+    needs: [forge-build-amd64, forge-build-arm64]
+    outputs:
+      app_name: ${{ needs.forge-build-amd64.outputs.app_name }}
+      app_dir: ${{ needs.forge-build-amd64.outputs.app_dir }}
+    steps:
+      - name: Sanitize names
+        run: |
+          echo "APP_NAME=${{ needs.forge-build-amd64.outputs.app_name }}" >> $GITHUB_ENV
+          echo "APP_DIR=${{ needs.forge-build-amd64.outputs.app_dir }}" >> $GITHUB_ENV
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Merge platform manifests
+        run: |
+          IMG="${{ secrets.DOCKERHUB_USERNAME }}/${{ env.APP_NAME }}"
+          SHA="${{ github.sha }}"
+          docker buildx imagetools create -t "$IMG:dev" -t "$IMG:$SHA" \
+            "$IMG:dev-amd64" \
+            "$IMG:dev-arm64"
+
+  # ── Deploy ──
   forge-deploy:
     name: forge-deploy
-    needs: forge-build
+    needs: forge-merge
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -55,8 +124,8 @@ jobs:
 
       - name: Sanitize names
         run: |
-          echo "APP_NAME=$(echo '${{ env.APP_NAME_RAW }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-          echo "APP_DIR=${{ secrets.DEPLOY_ROOT }}/$(echo '${{ env.APP_NAME_RAW }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          echo "APP_NAME=${{ needs.forge-merge.outputs.app_name }}" >> $GITHUB_ENV
+          echo "APP_DIR=${{ needs.forge-merge.outputs.app_dir }}" >> $GITHUB_ENV
 
       - name: Connect to Tailscale
         uses: tailscale/github-action@v4
