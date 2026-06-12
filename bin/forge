@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-FORGE_VERSION="0.1.14"
+FORGE_VERSION="0.1.18"
 FORGE_CONFIG_DIR="${FORGE_CONFIG_DIR:-$HOME/.forge/config}"
 FORGE_PORTS_FILE="$HOME/.forge/ports"
 FORGE_DOMAINS_FILE="$HOME/.forge/domains"
