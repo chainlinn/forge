@@ -124,8 +124,8 @@ jobs:
 
       - name: Sanitize names
         run: |
-          echo "APP_NAME=${{ needs.forge-merge.outputs.app_name }}" >> $GITHUB_ENV
-          echo "APP_DIR=${{ needs.forge-merge.outputs.app_dir }}" >> $GITHUB_ENV
+          echo "APP_NAME=$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          echo "APP_DIR=${{ secrets.DEPLOY_ROOT }}/$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Connect to Tailscale
         uses: tailscale/github-action@v4
@@ -154,7 +154,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           source: "docker-compose.yml,.forge/**"
-          target: ${{ env.APP_DIR }}/docker/compose/
+          target: ${{ secrets.DEPLOY_ROOT }}/$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')/docker/compose/
           strip_components: 0
 
       - name: Deploy via SSH over Tailscale
@@ -165,8 +165,10 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             set -e
-            cd ${{ env.APP_DIR }}/docker/compose
-            export APP_NAME="${{ env.APP_NAME }}" APP_DIR="${{ env.APP_DIR }}" DATA_DIR="${{ env.APP_DIR }}/data"
+            APP_NAME=$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')
+            APP_DIR=${{ secrets.DEPLOY_ROOT }}/$APP_NAME
+            cd "$APP_DIR/docker/compose"
+            export APP_NAME APP_DIR DATA_DIR="$APP_DIR/data"
             echo '${{ secrets.FORGE_ENV }}' > /tmp/forge-env && set -a && source /tmp/forge-env && set +a
             [ -f .forge/hooks/env/load-env.sh ] && source .forge/hooks/env/load-env.sh
             mkdir -p "$DATA_DIR"

@@ -4,5 +4,5 @@ on: workflow_dispatch
 
 jobs:
   cleanup:
-    uses: chainlinn/forge/.github/workflows/cleanup.yml@v0.1.15
+    uses: chainlinn/forge/.github/workflows/cleanup.yml@v0.1.17
     secrets: inherit
